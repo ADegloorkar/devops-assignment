@@ -6,19 +6,19 @@ environment {
 } 
 
 stages {
-    stage ("Checkout") {
+    stage('Checkout') {
         steps {
             checkout scm
         }
     }
 
-    stage ("AWS Authentication ") {
+    stage('AWS Authentication') {
         steps {
             sh 'aws sts get-caller-identity'
         }
     }
 
-    stage (Terraform Init) {
+    stage('Terraform Init') {
         steps {
             dir ('terraform') {
                 sh 'terraform init'
@@ -26,7 +26,7 @@ stages {
         }
     }
 
-    stage (Terraform validate) {
+    stage('Terraform validate') {
         steps {
             dir ('terraform') {
                 sh 'terraform validate'
@@ -34,7 +34,7 @@ stages {
         }
     }
 
-    stage (Teraform plan) {
+    stage('Terraform plan') {
         steps {
             dir ('terraform') {
                 sh 'terraform plan'
