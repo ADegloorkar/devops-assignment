@@ -12,7 +12,7 @@ resource "aws_vpc" "main" {
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.0.1.0/24"
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
 
   tags = {
     Name = "${var.project_name}-public-subnet"
@@ -46,6 +46,7 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
+#checkov:skip=CKV_AWS_260:Public HTTP access is intentional for the sample web application.
 
 resource "aws_security_group" "app_sg" {
   name        = "${var.project_name}-app-sg"
@@ -54,7 +55,7 @@ resource "aws_security_group" "app_sg" {
 
 
   ingress {
-    description = "HTTP access"
+    description = "Public HTTP access for sample application"
     from_port  = 80
     to_port     = 80
     protocol    = "tcp"
@@ -63,6 +64,7 @@ resource "aws_security_group" "app_sg" {
 
   }
   egress {
+    description = "Allow all outbound traffic"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
