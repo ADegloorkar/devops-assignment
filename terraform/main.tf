@@ -46,9 +46,10 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-#checkov:skip=CKV_AWS_260:Public HTTP access is intentional for the sample web application.
 
 resource "aws_security_group" "app_sg" {
+    #checkov:skip=CKV_AWS_260:Public HTTP is intentional for the sample web application.
+
   name        = "${var.project_name}-app-sg"
   description = "Security group for the application"
   vpc_id      = aws_vpc.main.id
