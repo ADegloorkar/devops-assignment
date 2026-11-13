@@ -495,8 +495,8 @@ resource "aws_iam_role_policy" "scheduler_invoke_lambda_policy" {
 }
 
 # Schedule to start non-production EC2 instances at 9 AM IST
-#checkov:skip=CKV_AWS_297:Customer-managed KMS encryption is not required for this assignment.
 resource "aws_scheduler_schedule" "ec2_start_schedule" {
+  #checkov:skip=CKV_AWS_297:Customer-managed KMS encryption is not required for this assignment.
   name                         = "${var.project_name}-ec2-start-schedule"
   schedule_expression          = "cron(0 9 * * ? *)"
   schedule_expression_timezone = "Asia/Kolkata"
@@ -511,8 +511,8 @@ resource "aws_scheduler_schedule" "ec2_start_schedule" {
 }
 
 # Schedule to stop non-production EC2 instances at 9 PM IST
-#checkov:skip=CKV_AWS_297:Customer-managed KMS encryption is not required for this assignment.
 resource "aws_scheduler_schedule" "ec2_stop_schedule" {
+  #checkov:skip=CKV_AWS_297:Customer-managed KMS encryption is not required for this assignment.
   name                         = "${var.project_name}-ec2-stop-schedule"
   schedule_expression          = "cron(0 21 * * ? *)"
   schedule_expression_timezone = "Asia/Kolkata"
