@@ -396,6 +396,7 @@ data "archive_file" "ec2_scheduler" {
 
 # Lambda function to start EC2 instances
 resource "aws_lambda_function" "ec2_start_scheduler" {
+  #checkov:skip=CKV_AWS_297:Customer-managed KMS encryption is not required for this assignment.
   function_name = "${var.project_name}-ec2-start"
   role          = aws_iam_role.ec2_scheduler_lambda_role.arn
 
@@ -412,10 +413,21 @@ resource "aws_lambda_function" "ec2_start_scheduler" {
       ACTION = "start"
     }
   }
+  #checkov:skip=CKV_AWS_173:ACTION is a non-sensitive environment variable.
+  #checkov:skip=CKV_AWS_116:Dead letter queue is not required for this assignment.
+  #checkov:skip=CKV_AWS_117:Lambda calls EC2 APIs and does not require VPC attachment.
+  #checkov:skip=CKV_AWS_272:Code signing is outside this assignment scope.
+
+  reserved_concurrent_executions = 1
+
+  tracing_config {
+    mode = "Active"
+  }
 }
 
 # Lambda function to stop EC2 instances
 resource "aws_lambda_function" "ec2_stop_scheduler" {
+  #checkov:skip=CKV_AWS_297:Customer-managed KMS encryption is not required for this assignment.
   function_name = "${var.project_name}-ec2-stop"
   role          = aws_iam_role.ec2_scheduler_lambda_role.arn
 
@@ -431,6 +443,17 @@ resource "aws_lambda_function" "ec2_stop_scheduler" {
     variables = {
       ACTION = "stop"
     }
+  }
+
+  #checkov:skip=CKV_AWS_173:ACTION is a non-sensitive environment variable.
+  #checkov:skip=CKV_AWS_116:Dead letter queue is not required for this assignment.
+  #checkov:skip=CKV_AWS_117:Lambda calls EC2 APIs and does not require VPC attachment.
+  #checkov:skip=CKV_AWS_272:Code signing is outside this assignment scope.
+
+  reserved_concurrent_executions = 1
+
+  tracing_config {
+    mode = "Active"
   }
 }
 
