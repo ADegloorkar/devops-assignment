@@ -1,56 +1,91 @@
+
 pipeline {
-agent any   
-environment {
-    AWS_DEFAULT_REGION = 'us-east-1'
-PATH = "/var/lib/jenkins/.local/bin:${env.PATH}"
-} 
+    agent any
 
-stages {
-    stage('Checkout') {
-        steps {
-            checkout scm
-        }
+    parameters {
+        choice(
+            name: 'TERRAFORM_ACTION',
+            choices: ['plan', 'apply'],
+            description: 'Choose Terraform action'
+        )
     }
 
-    stage('AWS Authentication') {
-        steps {
-            sh 'aws sts get-caller-identity'
-        }
+    environment {
+        AWS_DEFAULT_REGION = 'us-east-1'
+        PATH = "/var/lib/jenkins/.local/bin:${env.PATH}"
     }
 
-    stage('Terraform Init') {
-        steps {
-            dir ('terraform') {
-                sh 'terraform init'
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('AWS Authentication') {
+            steps {
+                sh 'aws sts get-caller-identity'
+            }
+        }
+
+        stage('Terraform Init') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform init'
+                }
+            }
+        }
+
+        stage('Terraform Validate') {
+            steps {
+                dir('terraform') {
+                    sh 'terraform validate'
+                }
+            }
+        }
+
+        stage('Checkov Security Scan') {
+            steps {
+                dir('terraform') {
+                    sh 'checkov --version'
+                    sh 'checkov --directory . --framework terraform'
+                }
+            }
+        }
+
+        stage('Terraform Plan') {
+            when {
+                expression {
+                    params.TERRAFORM_ACTION == 'plan'
+                }
+            }
+            steps {
+                dir('terraform') {
+                    sh 'terraform plan'
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            when {
+                expression {
+                    params.TERRAFORM_ACTION == 'apply'
+                }
+            }
+            steps {
+                dir('terraform') {
+                    sh 'terraform plan -out=tfplan'
+                    sh 'terraform apply -auto-approve tfplan'
+                }
             }
         }
     }
 
-    stage('Terraform validate') {
-        steps {
-            dir ('terraform') {
-                sh 'terraform validate'
+    post {
+        always {
+            dir('terraform') {
+                sh 'rm -f tfplan'
             }
         }
     }
-
-    stage('Checkov Security Scan') {
-        steps {
-            dir('terraform'){
-
-                sh 'checkov --version'
-                sh 'checkov --directory . --framework terraform'
-            }
-        }
-    }
-
-    stage('Terraform plan') {
-        steps {
-            dir ('terraform') {
-                sh 'terraform plan'
-            }
-        }
-    }
-
-}
 }
