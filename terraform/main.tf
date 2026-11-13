@@ -418,7 +418,7 @@ resource "aws_lambda_function" "ec2_start_scheduler" {
   #checkov:skip=CKV_AWS_117:Lambda calls EC2 APIs and does not require VPC attachment.
   #checkov:skip=CKV_AWS_272:Code signing is outside this assignment scope.
 
-  reserved_concurrent_executions = 1
+ 
 
   tracing_config {
     mode = "Active"
@@ -450,7 +450,7 @@ resource "aws_lambda_function" "ec2_stop_scheduler" {
   #checkov:skip=CKV_AWS_117:Lambda calls EC2 APIs and does not require VPC attachment.
   #checkov:skip=CKV_AWS_272:Code signing is outside this assignment scope.
 
-  reserved_concurrent_executions = 1
+  
 
   tracing_config {
     mode = "Active"
