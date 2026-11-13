@@ -203,6 +203,8 @@ data "aws_caller_identity" "current" {}
 
 data "aws_partition" "current" {}
 
+data "aws_region" "current" {}
+
 resource "aws_kms_key" "vpc_logs" {
   description             = "KMS key for VPC Flow Logs encryption"
   deletion_window_in_days = 7
@@ -249,7 +251,7 @@ resource "aws_kms_key" "vpc_logs" {
       }
     ]
   })
-    tags = {
+  tags = {
     Name = "${var.project_name}-logs-key"
   }
 }
@@ -325,5 +327,177 @@ data "aws_ami" "ubuntu" {
   filter {
     name   = "architecture"
     values = ["x86_64"]
+  }
+}
+
+# IAM Role for EC2 Scheduler Lambda
+resource "aws_iam_role" "ec2_scheduler_lambda_role" {
+  name = "${var.project_name}-ec2-scheduler-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "lambda.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+# Allow Lambda to write logs to CloudWatch
+resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
+  role       = aws_iam_role.ec2_scheduler_lambda_role.name
+  policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+# Allow Lambda to manage only eligible non-production EC2 instances
+
+resource "aws_iam_role_policy" "ec2_scheduler_permissions" {
+  name = "${var.project_name}-ec2-scheduler-permissions"
+  role = aws_iam_role.ec2_scheduler_lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:DescribeInstances"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:StartInstances",
+          "ec2:StopInstances"
+        ]
+        Resource = "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:instance/*"
+        Condition = {
+          StringEquals = {
+            "ec2:ResourceTag/Environment" = "NonProd"
+            "ec2:ResourceTag/Autostop"    = "true"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Package Python Lambda function
+
+data "archive_file" "ec2_scheduler" {
+  type        = "zip"
+  source_file = "${path.module}/../scripts/ec2_scheduler.py"
+  output_path = "${path.module}/ec2_scheduler.zip"
+}
+
+
+# Lambda function to start EC2 instances
+resource "aws_lambda_function" "ec2_start_scheduler" {
+  function_name = "${var.project_name}-ec2-start"
+  role          = aws_iam_role.ec2_scheduler_lambda_role.arn
+
+  runtime = "python3.12"
+  handler = "ec2_scheduler.lambda_handler"
+
+  filename         = data.archive_file.ec2_scheduler.output_path
+  source_code_hash = data.archive_file.ec2_scheduler.output_base64sha256
+
+  timeout = 60
+
+  environment {
+    variables = {
+      ACTION = "start"
+    }
+  }
+}
+
+# Lambda function to stop EC2 instances
+resource "aws_lambda_function" "ec2_stop_scheduler" {
+  function_name = "${var.project_name}-ec2-stop"
+  role          = aws_iam_role.ec2_scheduler_lambda_role.arn
+
+  runtime = "python3.12"
+  handler = "ec2_scheduler.lambda_handler"
+
+  filename         = data.archive_file.ec2_scheduler.output_path
+  source_code_hash = data.archive_file.ec2_scheduler.output_base64sha256
+
+  timeout = 60
+
+  environment {
+    variables = {
+      ACTION = "stop"
+    }
+  }
+}
+
+
+# IAM Role for EventBridge Scheduler
+resource "aws_iam_role" "scheduler_invoke_lambda_role" {
+  name = "${var.project_name}-scheduler-invoke-lambda-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "scheduler.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+# Allow EventBridge Scheduler to invoke both Lambda functions
+resource "aws_iam_role_policy" "scheduler_invoke_lambda_policy" {
+  name = "${var.project_name}-scheduler-invoke-lambda-policy"
+  role = aws_iam_role.scheduler_invoke_lambda_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "lambda:InvokeFunction"
+      ]
+      Resource = [
+        aws_lambda_function.ec2_start_scheduler.arn,
+        aws_lambda_function.ec2_stop_scheduler.arn
+      ]
+    }]
+  })
+}
+
+# Schedule to start non-production EC2 instances at 9 AM IST
+resource "aws_scheduler_schedule" "ec2_start_schedule" {
+  name                         = "${var.project_name}-ec2-start-schedule"
+  schedule_expression          = "cron(0 9 * * ? *)"
+  schedule_expression_timezone = "Asia/Kolkata"
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.ec2_start_scheduler.arn
+    role_arn = aws_iam_role.scheduler_invoke_lambda_role.arn
+  }
+}
+
+# Schedule to stop non-production EC2 instances at 9 PM IST
+resource "aws_scheduler_schedule" "ec2_stop_schedule" {
+  name                         = "${var.project_name}-ec2-stop-schedule"
+  schedule_expression          = "cron(0 21 * * ? *)"
+  schedule_expression_timezone = "Asia/Kolkata"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_lambda_function.ec2_stop_scheduler.arn
+    role_arn = aws_iam_role.scheduler_invoke_lambda_role.arn
   }
 }
