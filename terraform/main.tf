@@ -395,6 +395,7 @@ data "archive_file" "ec2_scheduler" {
 
 
 # Lambda function to start EC2 instances
+#checkov:skip=CKV_AWS_115:Reserved concurrency cannot be configured because of the AWS account concurrency quota.
 resource "aws_lambda_function" "ec2_start_scheduler" {
   #checkov:skip=CKV_AWS_297:Customer-managed KMS encryption is not required for this assignment.
   function_name = "${var.project_name}-ec2-start"
@@ -426,6 +427,7 @@ resource "aws_lambda_function" "ec2_start_scheduler" {
 }
 
 # Lambda function to stop EC2 instances
+#checkov:skip=CKV_AWS_115:Reserved concurrency cannot be configured because of the AWS account concurrency quota.
 resource "aws_lambda_function" "ec2_stop_scheduler" {
   #checkov:skip=CKV_AWS_297:Customer-managed KMS encryption is not required for this assignment.
   function_name = "${var.project_name}-ec2-stop"
