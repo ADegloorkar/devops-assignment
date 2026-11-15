@@ -1,0 +1,42 @@
+---
+- name: Deploy Flask application using Docker
+  hosts: app
+  become: true
+
+  tasks:
+    - name: Ensure Docker service is running
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Remove existing application container
+      ansible.builtin.command:
+        cmd: docker rm -f devops-flask-app
+      register: remove_container
+      failed_when: false
+      changed_when: remove_container.rc == 0
+
+    - name: Start Flask application container
+      ansible.builtin.command:
+        cmd: >-
+          docker run -d
+          --name devops-flask-app
+          -p 80:5000
+          --restart unless-stopped
+          devops-assignment-app:v1
+      changed_when: true
+
+    - name: Verify Flask application responds
+      ansible.builtin.uri:
+        url: http://127.0.0.1
+        status_code: 200
+        return_content: true
+      register: app_response
+      retries: 5
+      delay: 3
+      until: app_response.status == 200
+
+    - name: Confirm deployment
+      ansible.builtin.debug:
+        msg: "Flask application deployment successful!"
